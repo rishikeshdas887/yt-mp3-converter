@@ -97,14 +97,14 @@ function sanitizeYouTubeID(input) {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SonicStream Authentic MP3 Transcoder Engine', version: '10.0.0' });
+  res.json({ status: 'ok', service: 'SonicStream Authentic Original YouTube Audio Engine', version: '11.0.0' });
 });
 
 app.get('/api/trending', (req, res) => {
   res.json({ success: true, tracks: TRENDING_TRACKS });
 });
 
-// Extract Original Video Metadata
+// Extract Original Video Metadata via youtube-dl-exec
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   const videoId = sanitizeYouTubeID(url);
@@ -121,7 +121,8 @@ app.post('/api/extract', async (req, res) => {
       noWarnings: true,
       noCallHome: true,
       noCheckCertificate: true,
-      preferFreeFormats: true
+      preferFreeFormats: true,
+      extractorArgs: "youtube:player_client=android"
     });
 
     const durationSec = json.duration || 210;
@@ -186,15 +187,15 @@ app.post('/api/extract', async (req, res) => {
   }
 });
 
-// Stream ORIGINAL Audio Track for HTML5 Audio Player
+// Stream ORIGINAL YouTube Audio for HTML5 Audio Player
 app.get('/api/audio/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
-  await transcodeYouTubeAudioToMP3(videoId, "320", res, false);
+  await streamOriginalYouTubeAudioTrack(videoId, res, false);
 });
 
-// Download ORIGINAL Converted MP3 Track
+// Download ORIGINAL YouTube Audio Stream
 app.get('/api/download/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   const title = req.query.title ? decodeURIComponent(req.query.title) : `SonicStream_${videoId}`;
@@ -208,7 +209,7 @@ app.get('/api/download/:videoId', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_${bitrate}kbps.mp3"`);
   res.setHeader('Cache-Control', 'no-cache');
 
-  await transcodeYouTubeAudioToMP3(videoId, bitrate, res, true);
+  await streamOriginalYouTubeAudioTrack(videoId, res, true);
 });
 
 // Audio Trimmer Endpoint: Serves Trimmed Original MP3 Ringtone Clip
@@ -227,7 +228,7 @@ app.get('/api/trim/:videoId', async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_Trimmed_${Math.floor(startSec)}s-${Math.floor(endSec)}s_${bitrate}kbps.mp3"`);
   res.setHeader('Cache-Control', 'no-cache');
 
-  await transcodeTrimmedYouTubeAudioToMP3(videoId, startSec, endSec, bitrate, res);
+  await streamTrimmedYouTubeAudioTrack(videoId, startSec, endSec, bitrate, res);
 });
 
 // Preview Audio Trimmer Stream
@@ -239,78 +240,59 @@ app.get('/api/trim-preview/:videoId', async (req, res) => {
 
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
-  await transcodeTrimmedYouTubeAudioToMP3(videoId, startSec, endSec, bitrate, res);
+  await streamTrimmedYouTubeAudioTrack(videoId, startSec, endSec, bitrate, res);
 });
 
-// Core Function: Fetch YouTube Stream & Transcode Container to Pure MP3 via FFmpeg libmp3lame
-async function transcodeYouTubeAudioToMP3(videoId, bitrate, res, isDownload) {
+// Core Function: Extract & Stream the EXACT ORIGINAL YouTube Audio Track (NO FAKE TUNES)
+async function streamOriginalYouTubeAudioTrack(videoId, res, isDownload) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   try {
     const directAudioUrl = await youtubedl(youtubeUrl, {
       getUrl: true,
-      format: "18/bestaudio/best"
+      format: "bestaudio/best",
+      extractorArgs: "youtube:player_client=android"
     });
 
     if (directAudioUrl && directAudioUrl.trim()) {
       const cleanUrl = directAudioUrl.trim();
-
-      const response = await axios.get(cleanUrl, {
+      
+      const audioResponse = await axios.get(cleanUrl, {
         responseType: 'stream',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
 
-      const ffmpeg = spawn(ffmpegPath, [
-        '-i', 'pipe:0',
-        '-vn',                         // Disable video stream processing
-        '-c:a', 'libmp3lame',          // Genuine MP3 LAME encoder
-        '-b:a', `${bitrate}k`,          // Bitrate
-        '-ac', '2',                    // Stereo
-        '-ar', '44100',                // 44.1kHz sample rate
-        '-id3v2_version', '3',         // ID3v2 header
-        '-f', 'mp3',
-        'pipe:1'
-      ]);
-
-      response.data.pipe(ffmpeg.stdin);
-
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Accept-Ranges', 'bytes');
-      return ffmpeg.stdout.pipe(res);
+      return audioResponse.data.pipe(res);
     }
   } catch (err) {
-    console.warn("YouTube direct MP3 transcode warning:", err.message);
+    console.warn("YouTube direct audio stream error:", err.message);
   }
 
-  return sendSampleFallbackBuffer(res);
+  return res.status(404).json({ success: false, error: 'Could not extract original audio stream for this YouTube video.' });
 }
 
-// Trimmed Original YouTube Audio Slicer & Transcoder
-async function transcodeTrimmedYouTubeAudioToMP3(videoId, startSec, endSec, bitrate, res) {
+// Trimmed Original YouTube Audio Slicer
+async function streamTrimmedYouTubeAudioTrack(videoId, startSec, endSec, bitrate, res) {
   const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
   const clipDuration = Math.max(1, endSec - startSec);
 
   try {
     const directAudioUrl = await youtubedl(youtubeUrl, {
       getUrl: true,
-      format: "18/bestaudio/best"
+      format: "bestaudio/best",
+      extractorArgs: "youtube:player_client=android"
     });
 
     if (directAudioUrl && directAudioUrl.trim()) {
       const cleanUrl = directAudioUrl.trim();
 
-      const response = await axios.get(cleanUrl, {
-        responseType: 'stream',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-
       const ffmpeg = spawn(ffmpegPath, [
         '-ss', `${startSec}`,
-        '-i', 'pipe:0',
+        '-i', cleanUrl,
         '-t', `${clipDuration}`,
         '-vn',
         '-c:a', 'libmp3lame',
@@ -322,74 +304,15 @@ async function transcodeTrimmedYouTubeAudioToMP3(videoId, startSec, endSec, bitr
         'pipe:1'
       ]);
 
-      response.data.pipe(ffmpeg.stdin);
-
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Accept-Ranges', 'bytes');
       return ffmpeg.stdout.pipe(res);
     }
   } catch (err) {
-    console.warn("YouTube trim transcode error:", err.message);
+    console.warn("YouTube trim error:", err.message);
   }
 
-  return sendSampleFallbackBuffer(res);
-}
-
-function sendSampleFallbackBuffer(res) {
-  const sampleRate = 44100;
-  const numChannels = 2;
-  const bitsPerSample = 16;
-  const durationSeconds = 25;
-  const numSamples = sampleRate * durationSeconds;
-  const dataSize = numSamples * numChannels * (bitsPerSample / 8);
-  const headerSize = 44;
-  const totalSize = headerSize + dataSize;
-
-  const buffer = Buffer.alloc(totalSize);
-
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(totalSize - 8, 4);
-  buffer.write('WAVE', 8);
-
-  buffer.write('fmt ', 12);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(numChannels, 22);
-  buffer.writeUInt32LE(sampleRate, 24);
-  buffer.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
-  buffer.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
-  buffer.writeUInt16LE(bitsPerSample, 34);
-
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(dataSize, 40);
-
-  const freqs = [261.63, 329.63, 392.00, 523.25];
-  let offset = 44;
-
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    let envelope = 1.0;
-    if (t < 1.5) envelope = t / 1.5;
-    else if (t > durationSeconds - 1.5) envelope = (durationSeconds - t) / 1.5;
-
-    let sample = 0;
-    freqs.forEach((f, idx) => {
-      const amp = 0.25 / (idx + 1);
-      sample += Math.sin(2 * Math.PI * f * t) * amp;
-    });
-
-    sample = sample * envelope * 0.3;
-    const intSample = Math.floor(Math.max(-1, Math.min(1, sample)) * 32767);
-
-    buffer.writeInt16LE(intSample, offset);
-    buffer.writeInt16LE(intSample, offset + 2);
-    offset += 4;
-  }
-
-  res.setHeader('Content-Type', 'audio/wav');
-  res.setHeader('Content-Length', totalSize);
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.end(buffer);
+  return res.status(404).json({ success: false, error: 'Could not extract trimmed audio clip for this YouTube video.' });
 }
 
 // Google & Apple Auth Simulation Endpoints
@@ -425,7 +348,7 @@ app.post('/api/auth/apple', (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 SonicStream Authentic MP3 Transcoder Engine running on http://localhost:${PORT}`);
+    console.log(`🚀 SonicStream Authentic Original YouTube Audio Server running on http://localhost:${PORT}`);
   });
 }
 

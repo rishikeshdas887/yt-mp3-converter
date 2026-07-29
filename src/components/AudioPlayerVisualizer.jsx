@@ -190,18 +190,14 @@ export default function AudioPlayerVisualizer({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 glass-panel border-t border-cyan-500/30 backdrop-blur-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.8)]">
       
-      {/* Hidden Audio Tag with Fallback Source Handling */}
+      {/* Hidden Audio Tag */}
       <audio
         ref={audioRef}
         src={currentTrack.sampleAudioUrl || `/api/audio/${currentTrack.videoId}`}
         onTimeUpdate={handleTimeUpdate}
         onEnded={() => setIsPlaying(false)}
         onError={(e) => {
-          console.warn("Primary audio stream fallback triggered");
-          if (audioRef.current && !audioRef.current.src.includes('pixabay')) {
-            audioRef.current.src = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3";
-            audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-          }
+          console.warn("Audio stream loading error:", e);
         }}
       />
 
