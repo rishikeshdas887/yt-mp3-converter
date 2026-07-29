@@ -26,9 +26,11 @@ export default function AudioPlayerVisualizer({
   useEffect(() => {
     if (!currentTrack) return;
 
-    // Reset audio state
+    // Reset audio state & speed to normal 1.0x
+    setPlaybackSpeed(1.0);
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
+      audioRef.current.playbackRate = 1.0;
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     }
   }, [currentTrack]);
