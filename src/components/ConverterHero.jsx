@@ -157,20 +157,12 @@ export default function ConverterHero({
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             
             {/* Thumbnail */}
-            <div className="relative group shrink-0 w-full sm:w-56 h-36 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+            <div className="relative shrink-0 w-full sm:w-56 h-36 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
               <img 
                 src={videoData.thumbnail} 
                 alt={videoData.title} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                  onClick={() => onPlayTrack(videoData)}
-                  className="w-12 h-12 rounded-full bg-cyan-400 text-black flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-                >
-                  <Play className="w-6 h-6 fill-black ml-1" />
-                </button>
-              </div>
               <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-white text-[11px] font-mono">
                 {videoData.duration}
               </span>
@@ -233,25 +225,12 @@ export default function ConverterHero({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onPlayTrack(videoData);
-                  }}
-                  className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 shadow-lg cursor-pointer"
-                >
-                  <Play className="w-4 h-4 text-cyan-400 fill-cyan-400" />
-                  <span>PLAY AUDIO IN PLAYER</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
                     onDownloadTrack(videoData, selectedBitrate, 'mp3');
                   }}
-                  className="px-6 py-3 rounded-2xl btn-glow-cyan text-black font-extrabold text-xs flex items-center gap-2 transition-all font-mono hover:scale-105 shadow-xl cursor-pointer"
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-2xl btn-glow-cyan text-black font-extrabold text-sm flex items-center justify-center gap-2 transition-all font-mono hover:scale-105 shadow-xl cursor-pointer"
                 >
-                  <Download className="w-4 h-4 fill-black" />
-                  <span>QUICK DOWNLOAD MP3 (320KBPS)</span>
+                  <Download className="w-5 h-5 fill-black" />
+                  <span>DOWNLOAD MP3 (320KBPS STUDIO HD)</span>
                 </button>
               </div>
 

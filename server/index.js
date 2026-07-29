@@ -4,6 +4,8 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const youtubedl = require('youtube-dl-exec');
 const axios = require('axios');
+const { spawn } = require('child_process');
+const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -95,14 +97,14 @@ function sanitizeYouTubeID(input) {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SonicStream Authentic Pre-Resolved Original YouTube Audio Engine', version: '15.0.0' });
+  res.json({ status: 'ok', service: 'SonicStream Pure Audio MP3 Transcoder Engine', version: '16.0.0' });
 });
 
 app.get('/api/trending', (req, res) => {
   res.json({ success: true, tracks: TRENDING_TRACKS });
 });
 
-// ⚡ Extract Metadata + Pre-Resolve Direct YouTube Audio Stream URL
+// ⚡ Extract Video Metadata + Pre-Resolve Pure Audio Stream URL (No Video Stream)
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   const videoId = sanitizeYouTubeID(url);
@@ -130,18 +132,18 @@ app.post('/api/extract', async (req, res) => {
     }
   } catch (e) {}
 
-  // Pre-resolve direct YouTube audio stream URL for 100% instant player startup
+  // Pre-resolve pure audio stream URL (bestaudio format)
   try {
     const resolvedUrl = await youtubedl(youtubeUrl, {
       getUrl: true,
-      format: "bestaudio/best",
+      format: "bestaudio[ext=m4a]/bestaudio/best",
       extractorArgs: "youtube:player_client=android"
     });
     if (resolvedUrl && resolvedUrl.trim()) {
       directAudioStreamUrl = resolvedUrl.trim();
     }
   } catch (err) {
-    console.warn("Direct audio pre-resolution fallback:", err.message);
+    console.warn("Pure audio stream pre-resolution fallback:", err.message);
   }
 
   const mins = Math.floor(durationSec / 60);
@@ -171,7 +173,7 @@ app.post('/api/extract', async (req, res) => {
   });
 });
 
-// Stream ORIGINAL Audio for Audio Player (Direct Audio Proxy)
+// Stream Pure Original Audio for Audio Player
 app.get('/api/audio/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   if (!videoId) return res.status(400).send("Invalid Video ID");
@@ -181,7 +183,7 @@ app.get('/api/audio/:videoId', async (req, res) => {
   try {
     const directAudioUrl = await youtubedl(youtubeUrl, {
       getUrl: true,
-      format: "bestaudio/best",
+      format: "bestaudio[ext=m4a]/bestaudio/best",
       extractorArgs: "youtube:player_client=android"
     });
 
@@ -199,13 +201,13 @@ app.get('/api/audio/:videoId', async (req, res) => {
       return audioResponse.data.pipe(res);
     }
   } catch (err) {
-    console.warn("Audio stream proxy error:", err.message);
+    console.warn("Pure audio stream proxy error:", err.message);
   }
 
   return sendGuaranteedAudioStreamBuffer(res, 'mp3');
 });
 
-// GUARANTEED INSTANT DOWNLOAD ENDPOINT (Flush HTTP 200 Headers Immediately to Prevent Chrome Cancelation)
+// ⚡ DOWNLOAD PURE MP3 AUDIO (MPEG Audio Layer 3 - Guaranteed Pure Audio Format)
 app.get('/api/download/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   const title = req.query.title ? decodeURIComponent(req.query.title) : `SonicStream_${videoId}`;
@@ -238,23 +240,38 @@ app.get('/api/download/:videoId', async (req, res) => {
   try {
     const directAudioUrl = await youtubedl(youtubeUrl, {
       getUrl: true,
-      format: "bestaudio/best",
+      format: "bestaudio[ext=m4a]/bestaudio/best",
       extractorArgs: "youtube:player_client=android"
     });
 
     if (directAudioUrl && directAudioUrl.trim()) {
       const cleanUrl = directAudioUrl.trim();
-      const audioResponse = await axios.get(cleanUrl, {
+
+      const response = await axios.get(cleanUrl, {
         responseType: 'stream',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
       });
 
-      return audioResponse.data.pipe(res);
+      // Transcode input stream into genuine MP3 audio format using FFmpeg libmp3lame (Strips video completely)
+      const ffmpeg = spawn(ffmpegPath, [
+        '-i', 'pipe:0',
+        '-vn',                         // Strip video track completely
+        '-c:a', 'libmp3lame',          // Genuine MPEG Audio Layer 3 LAME encoder
+        '-b:a', `${bitrate}k`,         // 320 kbps Bitrate
+        '-ac', '2',                    // Stereo
+        '-ar', '44100',                // 44.1kHz sample rate
+        '-id3v2_version', '3',         // Valid ID3v2 header
+        '-f', 'mp3',
+        'pipe:1'
+      ]);
+
+      response.data.pipe(ffmpeg.stdin);
+      return ffmpeg.stdout.pipe(res);
     }
   } catch (err) {
-    console.warn("YouTube download fetch warning:", err.message);
+    console.warn("YouTube MP3 audio download error:", err.message);
   }
 
   return sendGuaranteedAudioStreamBuffer(res, targetFormat);
@@ -282,7 +299,7 @@ app.get('/api/trim-preview/:videoId', async (req, res) => {
   return sendGuaranteedAudioStreamBuffer(res, 'mp3');
 });
 
-// ⚡ Guaranteed Audio Stream Buffer Generator
+// ⚡ Guaranteed Pure Audio Stream Buffer Generator
 function sendGuaranteedAudioStreamBuffer(res, format) {
   const sampleRate = 44100;
   const numChannels = 2;
@@ -371,7 +388,7 @@ app.post('/api/auth/apple', (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 SonicStream Pre-Resolved Original YouTube Audio Server running on http://localhost:${PORT}`);
+    console.log(`🚀 SonicStream Pure Audio MP3 Transcoder Server running on http://localhost:${PORT}`);
   });
 }
 

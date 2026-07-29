@@ -142,14 +142,6 @@ export default function App() {
       {/* Footer */}
       <Footer />
 
-      {/* Playable Live Audio Player with Canvas Spectrum Visualizer */}
-      <AudioPlayerVisualizer
-        currentTrack={currentTrack}
-        bitrate={selectedBitrate}
-        onOpenTrimmer={(track) => setTrimmedTrack(track)}
-        onDownload={handleDownload}
-      />
-
       {/* Audio Ringtone Cutter Modal */}
       {trimmedTrack && (
         <AudioTrimmerModal
