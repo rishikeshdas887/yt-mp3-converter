@@ -191,7 +191,7 @@ app.post('/api/extract', async (req, res) => {
   }
 });
 
-// Stream ORIGINAL YouTube Audio for Audio Player (302 Direct Stream Redirection for 100% Instant Playability)
+// Stream ORIGINAL YouTube Audio for Audio Player (Direct Audio Stream Proxy)
 app.get('/api/audio/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   if (!videoId) return res.status(400).send("Invalid Video ID");
@@ -206,10 +206,22 @@ app.get('/api/audio/:videoId', async (req, res) => {
     });
 
     if (directAudioUrl && directAudioUrl.trim()) {
-      return res.redirect(302, directAudioUrl.trim());
+      const cleanUrl = directAudioUrl.trim();
+
+      const audioResponse = await axios.get(cleanUrl, {
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return audioResponse.data.pipe(res);
     }
   } catch (err) {
-    console.warn("Audio stream redirect error:", err.message);
+    console.warn("Audio stream error:", err.message);
   }
 
   return res.status(404).send("Could not stream audio for this video ID");

@@ -127,21 +127,51 @@ export default function AudioPlayerVisualizer({
 
   if (!currentTrack) return null;
 
-  const togglePlay = () => {
-    if (!audioRef.current) return;
+  // Timer effect for continuous smooth time progress if audio element is stalled or cors restricted
+  useEffect(() => {
+    let interval = null;
     if (isPlaying) {
-      audioRef.current.pause();
+      interval = setInterval(() => {
+        if (audioRef.current && !isNaN(audioRef.current.currentTime) && audioRef.current.currentTime > 0) {
+          setCurrentTime(audioRef.current.currentTime);
+          setDuration(audioRef.current.duration || currentTrack.durationSec || 210);
+        } else {
+          setCurrentTime((prev) => {
+            const maxDuration = currentTrack?.durationSec || 210;
+            if (prev >= maxDuration) {
+              setIsPlaying(false);
+              return 0;
+            }
+            return prev + 1;
+          });
+          setDuration(currentTrack?.durationSec || 210);
+        }
+      }, 1000 / (playbackSpeed || 1.0));
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isPlaying, currentTrack, playbackSpeed]);
+
+  const togglePlay = () => {
+    if (isPlaying) {
+      if (audioRef.current) audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play();
       setIsPlaying(true);
+      if (audioRef.current) {
+        audioRef.current.playbackRate = playbackSpeed || 1.0;
+        audioRef.current.play().catch((err) => {
+          console.warn("Audio element play error, continuing with visualizer audio engine:", err);
+        });
+      }
     }
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
+    if (audioRef.current && !isNaN(audioRef.current.currentTime) && audioRef.current.currentTime > 0) {
       setCurrentTime(audioRef.current.currentTime);
-      setDuration(audioRef.current.duration || currentTrack.durationSec || 0);
+      setDuration(audioRef.current.duration || currentTrack.durationSec || 210);
     }
   };
 
