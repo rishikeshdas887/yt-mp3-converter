@@ -229,7 +229,12 @@ export default function ConverterHero({
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3">
                 <button
-                  onClick={() => onPlayTrack(videoData)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPlayTrack(videoData);
+                  }}
                   className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 shadow-lg cursor-pointer"
                 >
                   <Play className="w-4 h-4 text-cyan-400 fill-cyan-400" />
@@ -237,7 +242,12 @@ export default function ConverterHero({
                 </button>
 
                 <button
-                  onClick={() => onDownloadTrack(videoData, selectedBitrate, 'mp3')}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onDownloadTrack(videoData, selectedBitrate, 'mp3');
+                  }}
                   className="px-6 py-3 rounded-2xl btn-glow-cyan text-black font-extrabold text-xs flex items-center gap-2 transition-all font-mono hover:scale-105 shadow-xl cursor-pointer"
                 >
                   <Download className="w-4 h-4 fill-black" />
