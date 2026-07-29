@@ -86,14 +86,14 @@ export default function App() {
     }
   };
 
-  // Download MP3 handler
-  const handleDownload = (track, bitrateChoice) => {
+  // Download Audio Handler (Supports MP3, M4A, WEBM, WAV, FLAC with explicit resolutions)
+  const handleDownload = (track, bitrateChoice = '320', formatChoice = 'mp3') => {
     confetti({ particleCount: 70, spread: 60, origin: { y: 0.5 } });
     
-    const downloadUrl = `/api/download/${track.videoId}?title=${encodeURIComponent(track.title)}&bitrate=${bitrateChoice}`;
+    const downloadUrl = `/api/download/${track.videoId}?title=${encodeURIComponent(track.title)}&bitrate=${bitrateChoice}&format=${formatChoice}`;
     const a = document.createElement('a');
     a.href = downloadUrl;
-    a.download = `${track.title}_${bitrateChoice}kbps.mp3`;
+    a.download = `${track.title}_${bitrateChoice}kbps.${formatChoice}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

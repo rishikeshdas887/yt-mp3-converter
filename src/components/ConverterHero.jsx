@@ -186,40 +186,62 @@ export default function ConverterHero({
                 <p className="text-sm text-slate-400 font-medium">{videoData.author} • {videoData.views} Views</p>
               </div>
 
-              {/* Bitrate Selection Chips */}
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                {videoData.availableBitrates.map((b) => (
-                  <button
-                    key={b.value}
-                    onClick={() => setSelectedBitrate(b.value)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                      selectedBitrate === b.value
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(0,240,255,0.3)]'
-                        : 'bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <span>{b.label}</span>
-                    {b.badge && <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-black font-extrabold text-[9px] rounded-full">{b.badge}</span>}
-                  </button>
-                ))}
+              {/* Multi-Format & Resolution Selection Options */}
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block text-left">
+                  Select Download Format & Audio Resolution:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {(videoData.availableFormats || [
+                    { format: "mp3", label: "MP3 Studio 320k", resolution: "320 kbps (44.1kHz Stereo)", size: "8.4 MB", badge: "VIP HQ", ext: "mp3" },
+                    { format: "mp3", label: "MP3 High 256k", resolution: "256 kbps (44.1kHz)", size: "6.7 MB", ext: "mp3" },
+                    { format: "mp3", label: "MP3 Standard 192k", resolution: "192 kbps (Standard)", size: "5.0 MB", ext: "mp3" },
+                    { format: "m4a", label: "M4A Apple AAC", resolution: "256 kbps (Apple AAC)", size: "6.7 MB", ext: "m4a" },
+                    { format: "webm", label: "WebM Opus 160k", resolution: "160 kbps (WebM)", size: "4.2 MB", ext: "webm" },
+                    { format: "wav", label: "WAV Studio Uncompressed", resolution: "1411 kbps (16-bit)", size: "36.9 MB", badge: "LOSSLESS", ext: "wav" },
+                    { format: "flac", label: "FLAC Audiophile Lossless", resolution: "Hi-Res Lossless", size: "25.2 MB", badge: "HI-RES", ext: "flac" }
+                  ]).map((fmtItem, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setSelectedBitrate(fmtItem.format === 'mp3' ? fmtItem.label.match(/\d+k/)?.[0]?.replace('k','') || '320' : '320');
+                        onDownloadTrack(videoData, fmtItem.format === 'mp3' ? fmtItem.label.match(/\d+k/)?.[0]?.replace('k','') || '320' : '320', fmtItem.format);
+                      }}
+                      className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-cyan-400 hover:bg-slate-800/80 cursor-pointer transition-all flex items-center justify-between group shadow-sm"
+                    >
+                      <div className="text-left">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-white group-hover:text-cyan-300">{fmtItem.label}</span>
+                          {fmtItem.badge && (
+                            <span className="px-1.5 py-0.2 bg-amber-500 text-black font-extrabold text-[9px] rounded-full">{fmtItem.badge}</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400">{fmtItem.resolution} • {fmtItem.size}</p>
+                      </div>
+                      <div className="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center opacity-80 group-hover:opacity-100 group-hover:bg-cyan-500 group-hover:text-black transition-all">
+                        <Download className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-3">
                 <button
                   onClick={() => onPlayTrack(videoData)}
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all hover:scale-105"
+                  className="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xs flex items-center gap-2 transition-all hover:scale-105 shadow-lg cursor-pointer"
                 >
                   <Play className="w-4 h-4 text-cyan-400 fill-cyan-400" />
                   <span>PLAY AUDIO IN PLAYER</span>
                 </button>
 
                 <button
-                  onClick={() => onDownloadTrack(videoData, selectedBitrate)}
-                  className="px-6 py-2.5 rounded-xl btn-glow-cyan text-black font-extrabold text-xs flex items-center gap-2 transition-all font-mono"
+                  onClick={() => onDownloadTrack(videoData, selectedBitrate, 'mp3')}
+                  className="px-6 py-3 rounded-2xl btn-glow-cyan text-black font-extrabold text-xs flex items-center gap-2 transition-all font-mono hover:scale-105 shadow-xl cursor-pointer"
                 >
                   <Download className="w-4 h-4 fill-black" />
-                  <span>DOWNLOAD MP3 ({selectedBitrate}KBPS)</span>
+                  <span>QUICK DOWNLOAD MP3 (320KBPS)</span>
                 </button>
               </div>
 
