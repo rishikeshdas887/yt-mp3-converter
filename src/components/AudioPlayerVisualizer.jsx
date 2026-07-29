@@ -286,13 +286,13 @@ export default function AudioPlayerVisualizer({
           <select
             value={playbackSpeed}
             onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
-            className="bg-slate-900 border border-slate-800 text-xs text-slate-300 rounded-xl px-2 py-1.5 font-mono cursor-pointer"
+            className="bg-slate-900 border border-slate-800 text-xs text-cyan-300 font-bold rounded-xl px-2.5 py-1.5 font-mono cursor-pointer shadow-inner"
           >
-            <option value="0.75">0.75x</option>
-            <option value="1.0">1.0x Speed</option>
-            <option value="1.25">1.25x</option>
-            <option value="1.5">1.5x</option>
-            <option value="2.0">2.0x</option>
+            <option value="1.0" className="bg-slate-900 text-white font-bold">1.0x Speed (Normal)</option>
+            <option value="0.75" className="bg-slate-900 text-white font-bold">0.75x Slow</option>
+            <option value="1.25" className="bg-slate-900 text-white font-bold">1.25x Fast</option>
+            <option value="1.5" className="bg-slate-900 text-white font-bold">1.5x Fast</option>
+            <option value="2.0" className="bg-slate-900 text-white font-bold">2.0x Ultra</option>
           </select>
 
           {/* Volume */}
