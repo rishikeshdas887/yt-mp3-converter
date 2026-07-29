@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+    background-color: #07080D;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(112, 0, 255, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(0, 240, 255, 0.15) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(255, 0, 122, 0.12) 0px, transparent 50%);
+    background-attachment: fixed;
+    color: #f1f5f9;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #090b12;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00F0FF;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(15, 18, 30, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-panel-glow {
+  background: rgba(18, 22, 38, 0.75);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.12), inset 0 0 15px rgba(112, 0, 255, 0.1);
+}
+
+.text-gradient-cyan {
+  background: linear-gradient(135deg, #00F0FF 0%, #7000FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, #FFE500 0%, #FF8A00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn-glow-cyan {
+  background: linear-gradient(135deg, #00F0FF 0%, #7000FF 100%);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-glow-cyan:hover {
+  box-shadow: 0 0 35px rgba(0, 240, 255, 0.7), 0 0 15px rgba(112, 0, 255, 0.8);
+  transform: translateY(-2px);
+}
+
+.btn-glow-pink {
+  background: linear-gradient(135deg, #FF007A 0%, #7000FF 100%);
+  box-shadow: 0 0 20px rgba(255, 0, 122, 0.4);
+}
+
+.btn-glow-pink:hover {
+  box-shadow: 0 0 35px rgba(255, 0, 122, 0.7);
+  transform: translateY(-2px);
+}
+
+/* Background Animated Grid */
+.bg-cyber-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
