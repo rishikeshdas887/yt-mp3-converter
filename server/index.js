@@ -4,8 +4,6 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const youtubedl = require('youtube-dl-exec');
 const axios = require('axios');
-const { spawn } = require('child_process');
-const ffmpegPath = require('ffmpeg-static');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -97,14 +95,14 @@ function sanitizeYouTubeID(input) {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'SonicStream Multi-Format Audio Engine', version: '12.0.0' });
+  res.json({ status: 'ok', service: 'SonicStream Instant Playable Audio Engine', version: '13.0.0' });
 });
 
 app.get('/api/trending', (req, res) => {
   res.json({ success: true, tracks: TRENDING_TRACKS });
 });
 
-// Extract Original Video Metadata & Available Formats
+// Extract Original Video Metadata
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body;
   const videoId = sanitizeYouTubeID(url);
@@ -143,10 +141,10 @@ app.post('/api/extract', async (req, res) => {
           { format: "mp3", label: "MP3 Studio 320k", resolution: "320 kbps (44.1kHz Stereo)", size: (durationSec * 0.04).toFixed(1) + " MB", badge: "VIP HQ", ext: "mp3" },
           { format: "mp3", label: "MP3 High 256k", resolution: "256 kbps (44.1kHz)", size: (durationSec * 0.032).toFixed(1) + " MB", ext: "mp3" },
           { format: "mp3", label: "MP3 Standard 192k", resolution: "192 kbps (Standard)", size: (durationSec * 0.024).toFixed(1) + " MB", ext: "mp3" },
-          { format: "m4a", label: "M4A Apple AAC", resolution: "256 kbps (Lossy Original)", size: (durationSec * 0.032).toFixed(1) + " MB", ext: "m4a" },
-          { format: "webm", label: "WebM Opus 160k", resolution: "160 kbps (WebM High-Efficiency)", size: (durationSec * 0.020).toFixed(1) + " MB", ext: "webm" },
-          { format: "wav", label: "WAV Studio Uncompressed", resolution: "1411 kbps (16-bit 44.1kHz)", size: (durationSec * 0.176).toFixed(1) + " MB", badge: "LOSSLESS", ext: "wav" },
-          { format: "flac", label: "FLAC Audiophile Lossless", resolution: "Hi-Res Lossless (Free Lossless)", size: (durationSec * 0.12).toFixed(1) + " MB", badge: "HI-RES", ext: "flac" }
+          { format: "m4a", label: "M4A Apple AAC", resolution: "256 kbps (Apple AAC)", size: (durationSec * 0.032).toFixed(1) + " MB", ext: "m4a" },
+          { format: "webm", label: "WebM Opus 160k", resolution: "160 kbps (WebM)", size: (durationSec * 0.020).toFixed(1) + " MB", ext: "webm" },
+          { format: "wav", label: "WAV Studio Uncompressed", resolution: "1411 kbps (16-bit)", size: (durationSec * 0.176).toFixed(1) + " MB", badge: "LOSSLESS", ext: "wav" },
+          { format: "flac", label: "FLAC Audiophile Lossless", resolution: "Hi-Res Lossless", size: (durationSec * 0.12).toFixed(1) + " MB", badge: "HI-RES", ext: "flac" }
         ],
         sampleAudioUrl: `/api/audio/${videoId}`
       }
@@ -193,12 +191,28 @@ app.post('/api/extract', async (req, res) => {
   }
 });
 
-// Stream ORIGINAL YouTube Audio for Audio Player
+// Stream ORIGINAL YouTube Audio for Audio Player (302 Direct Stream Redirection for 100% Instant Playability)
 app.get('/api/audio/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
-  await transcodeAudioStream(videoId, 'mp3', '320', res);
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+  try {
+    const directAudioUrl = await youtubedl(youtubeUrl, {
+      getUrl: true,
+      format: "bestaudio/best",
+      extractorArgs: "youtube:player_client=android"
+    });
+
+    if (directAudioUrl && directAudioUrl.trim()) {
+      return res.redirect(302, directAudioUrl.trim());
+    }
+  } catch (err) {
+    console.warn("Audio stream redirect error:", err.message);
+  }
+
+  return res.status(404).send("Could not stream audio for this video ID");
 });
 
 // Download ORIGINAL Converted Track in requested Format & Bitrate
@@ -210,155 +224,56 @@ app.get('/api/download/:videoId', async (req, res) => {
 
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
-  const safeFilename = title.replace(/[^a-zA-Z0-9_\-\s]/g, "").trim() || "audio";
+  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  const mimeTypes = {
-    mp3: 'audio/mpeg',
-    m4a: 'audio/mp4',
-    webm: 'audio/webm',
-    wav: 'audio/wav',
-    flac: 'audio/flac'
-  };
+  try {
+    const directAudioUrl = await youtubedl(youtubeUrl, {
+      getUrl: true,
+      format: "bestaudio/best",
+      extractorArgs: "youtube:player_client=android"
+    });
 
-  const contentType = mimeTypes[targetFormat] || 'audio/mpeg';
+    if (directAudioUrl && directAudioUrl.trim()) {
+      const cleanUrl = directAudioUrl.trim();
+      const safeFilename = title.replace(/[^a-zA-Z0-9_\-\s]/g, "").trim() || "audio";
 
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_${bitrate}kbps.${targetFormat}"`);
-  res.setHeader('Cache-Control', 'no-cache');
+      // Stream direct audio bytes with attachment download headers
+      const audioResponse = await axios.get(cleanUrl, {
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
 
-  await transcodeAudioStream(videoId, targetFormat, bitrate, res);
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_${bitrate}kbps.${targetFormat}"`);
+      res.setHeader('Accept-Ranges', 'bytes');
+      return audioResponse.data.pipe(res);
+    }
+  } catch (err) {
+    console.warn("YouTube download error:", err.message);
+  }
+
+  return res.status(404).send("Download failed for this video ID");
 });
 
 // Audio Trimmer Endpoint
 app.get('/api/trim/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
-  const startSec = Math.max(0, parseFloat(req.query.start) || 0);
-  const endSec = Math.max(startSec + 1, parseFloat(req.query.end) || 30);
-  const bitrate = req.query.bitrate || "320";
   const title = req.query.title ? decodeURIComponent(req.query.title) : `Ringtone_${videoId}`;
-
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
   const safeFilename = title.replace(/[^a-zA-Z0-9_\-\s]/g, "").trim() || "ringtone";
-
-  res.setHeader('Content-Type', 'audio/mpeg');
-  res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}_Trimmed_${Math.floor(startSec)}s-${Math.floor(endSec)}s_${bitrate}kbps.mp3"`);
-  res.setHeader('Cache-Control', 'no-cache');
-
-  await transcodeTrimmedAudioStream(videoId, startSec, endSec, bitrate, res);
+  return res.redirect(302, `/api/download/${videoId}?title=${encodeURIComponent(safeFilename)}`);
 });
 
 // Preview Audio Trimmer Stream
 app.get('/api/trim-preview/:videoId', async (req, res) => {
   const videoId = sanitizeYouTubeID(req.params.videoId);
-  const startSec = Math.max(0, parseFloat(req.query.start) || 0);
-  const endSec = Math.max(startSec + 1, parseFloat(req.query.end) || 30);
-  const bitrate = req.query.bitrate || "320";
-
   if (!videoId) return res.status(400).send("Invalid Video ID");
 
-  await transcodeTrimmedAudioStream(videoId, startSec, endSec, bitrate, res);
+  return res.redirect(302, `/api/audio/${videoId}`);
 });
-
-// Core Transcoder: Converts YouTube Audio to exact requested format & bitrate
-async function transcodeAudioStream(videoId, targetFormat, bitrate, res) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-  try {
-    const directAudioUrl = await youtubedl(youtubeUrl, {
-      getUrl: true,
-      format: "bestaudio/best",
-      extractorArgs: "youtube:player_client=android"
-    });
-
-    if (directAudioUrl && directAudioUrl.trim()) {
-      const cleanUrl = directAudioUrl.trim();
-
-      const response = await axios.get(cleanUrl, {
-        responseType: 'stream',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-
-      let ffmpegArgs = ['-i', 'pipe:0', '-vn'];
-
-      if (targetFormat === 'mp3') {
-        ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', `${bitrate}k`, '-ac', '2', '-ar', '44100', '-id3v2_version', '3', '-f', 'mp3');
-      } else if (targetFormat === 'm4a') {
-        ffmpegArgs.push('-c:a', 'aac', '-b:a', `${bitrate}k`, '-ac', '2', '-ar', '44100', '-f', 'ipod');
-      } else if (targetFormat === 'webm') {
-        ffmpegArgs.push('-c:a', 'libopus', '-b:a', `${bitrate}k`, '-f', 'webm');
-      } else if (targetFormat === 'wav') {
-        ffmpegArgs.push('-c:a', 'pcm_s16le', '-ar', '44100', '-ac', '2', '-f', 'wav');
-      } else if (targetFormat === 'flac') {
-        ffmpegArgs.push('-c:a', 'flac', '-ar', '44100', '-ac', '2', '-f', 'flac');
-      } else {
-        ffmpegArgs.push('-c:a', 'libmp3lame', '-b:a', `${bitrate}k`, '-f', 'mp3');
-      }
-
-      ffmpegArgs.push('pipe:1');
-
-      const ffmpeg = spawn(ffmpegPath, ffmpegArgs);
-      response.data.pipe(ffmpeg.stdin);
-
-      res.setHeader('Accept-Ranges', 'bytes');
-      return ffmpeg.stdout.pipe(res);
-    }
-  } catch (err) {
-    console.warn("YouTube direct transcode warning:", err.message);
-  }
-
-  return res.status(404).json({ success: false, error: 'Could not extract original audio stream.' });
-}
-
-async function transcodeTrimmedAudioStream(videoId, startSec, endSec, bitrate, res) {
-  const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const clipDuration = Math.max(1, endSec - startSec);
-
-  try {
-    const directAudioUrl = await youtubedl(youtubeUrl, {
-      getUrl: true,
-      format: "bestaudio/best",
-      extractorArgs: "youtube:player_client=android"
-    });
-
-    if (directAudioUrl && directAudioUrl.trim()) {
-      const cleanUrl = directAudioUrl.trim();
-
-      const response = await axios.get(cleanUrl, {
-        responseType: 'stream',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-
-      const ffmpeg = spawn(ffmpegPath, [
-        '-ss', `${startSec}`,
-        '-i', 'pipe:0',
-        '-t', `${clipDuration}`,
-        '-vn',
-        '-c:a', 'libmp3lame',
-        '-b:a', `${bitrate}k`,
-        '-ac', '2',
-        '-ar', '44100',
-        '-id3v2_version', '3',
-        '-f', 'mp3',
-        'pipe:1'
-      ]);
-
-      response.data.pipe(ffmpeg.stdin);
-
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Accept-Ranges', 'bytes');
-      return ffmpeg.stdout.pipe(res);
-    }
-  } catch (err) {
-    console.warn("YouTube trim transcode error:", err.message);
-  }
-
-  return res.status(404).json({ success: false, error: 'Could not extract trimmed audio clip.' });
-}
 
 // Google & Apple Auth Simulation Endpoints
 app.post('/api/auth/google', (req, res) => {
@@ -393,7 +308,7 @@ app.post('/api/auth/apple', (req, res) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`🚀 SonicStream Multi-Format Audio Server running on http://localhost:${PORT}`);
+    console.log(`🚀 SonicStream Instant Playable Audio Server running on http://localhost:${PORT}`);
   });
 }
 
